@@ -35,7 +35,9 @@ const operators = {
   '=': args => args.reduce((a, b) => a === b)
 }
 
-// checking for simple and nested expression
+/**
+ * Checking for simple and nested expression
+*/
 const expressionParser = input => {
   if (input[0] !== '(') {
     return null
@@ -147,9 +149,7 @@ const ifParser = input => {
 const symbolParser = input => {
   let regexSym = (/^[a-zA-Z]+/)
   let symbol = input.match(regexSym)
-  if (symbol && globalObj.hasOwnProperty(symbol[0])) {
-    return [globalObj[symbol[0]], input.slice(symbol[0].length)]
-  } else if (symbol) {
+  if (symbol) {
     return [symbol[0], input.slice(symbol[0].length)]
   }
   return null
@@ -169,29 +169,67 @@ const defineParser = input => {
   }
   input = input.slice(6)
   input = trimSpaces(input)
-  let result
+  let value
   // checking for symbol
   let symbol = symbolParser(input)
   if (!symbol) {
     return 'Error: define: symbol or pair expected but got undefined []'
   }
-
   input = trimSpaces(symbol[1])
+
   // checking for value and saving it to globalObj
-  let value = valueParser(input)
-  input = trimSpaces(value[1].slice(1))
+  value = lambdaParser(input)
+  if (!value) {
+    value = valueParser(input)
+  }
+
   if (value) {
     globalObj[symbol[0]] = value[0]
   } else {
     globalObj[symbol[0]] = ''
   }
-
-  if (input) {
-    result = valueParser(input)
-    return [result[0], result[1]]
-  }
-
+  input = trimSpaces(value[1].slice(1))
   return [globalObj, input]
+}
+
+/**
+ * parsing Lambda expression
+ */
+const lambdaParser = input => {
+  if (!input.startsWith('(')) {
+    return null
+  }
+  input = trimSpaces(input.slice(1))
+  if (!input.startsWith('lambda')) {
+    return null
+  }
+  input = input.slice(6)
+  let arg = getArguments(trimSpaces(input))
+  input = arg[1]
+  let bodyExp = extractExpression(trimSpaces(input))
+  input = bodyExp[1]
+  return [{args: arg[0], body: bodyExp[0]}, input.slice(1)]
+}
+/**
+ * Getting arguments of Lambda expression
+ */
+const getArguments = input => {
+  if (!input.startsWith('(')) {
+    return null
+  }
+  input = input.slice(1)
+  input = trimSpaces(input)
+  let ele
+  let arg = []
+  while (input[0] !== ')') {
+    ele = valueParser(input)
+    if (!ele) {
+      return null
+    }
+    arg.push(ele[0])
+    input = trimSpaces(ele[1])
+  }
+  return [arg, input.slice(1)]
 }
 
 const factoryParser = (...parsers) => {
@@ -206,7 +244,7 @@ const factoryParser = (...parsers) => {
   }
 }
 const valueParser = factoryParser(numberParser, expressionParser, symbolParser)
-const allParser = factoryParser(numberParser, expressionParser, ifParser, defineParser, symbolParser)
+const allParser = factoryParser(numberParser, expressionParser, ifParser, defineParser, lambdaParser, symbolParser)
 
 /**
  *parsing all parsers
@@ -242,9 +280,11 @@ const parse = (input) => {
 // console.log(parse('(if (<= 1 2) (if (<= 2 2) (+ 1 1) (+ 3 3)) (+ 4 4))'))
 // console.log(parse('(define r 4)'))
 // console.log(parse('(define)'))
-console.log(parse('(define lamda 10)'))
+// console.log(parse('(define lamda 10)'))
 // console.log(parse('(define r 10) r'))
-// // console.log(parse('(define k 8)(* k k)'))
+// console.log(parse('(define k 8)(* k k)'))
 // console.log(parse('(define k 8)(* r r)'))
 // console.log(parse('(define k 8)(* r)'))
 // console.log(parse('(define k 10)'))
+// console.log(parse('(define add (lambda (x y) (+ x y)))'))
+// console.log(parse('(lambda (x) (+ x x))'))

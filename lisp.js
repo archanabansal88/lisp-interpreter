@@ -1,3 +1,5 @@
+var globalObj = {}
+
 const numberParser = input => {
   let regexNum = /^(?:-)?(?:0|\d+)(?:\.\d+)?(?:(?:e|E)(?:\+|-)?\d+)?/
   let num = input.match(regexNum)
@@ -33,6 +35,7 @@ const operators = {
   '=': args => args.reduce((a, b) => a === b)
 }
 
+// checking for simple and nested expression
 const expressionParser = input => {
   if (input[0] !== '(') {
     return null
@@ -48,10 +51,7 @@ const expressionParser = input => {
   input = input.slice(operator.length + 1)
   input = trimSpaces(input)
   while (input[0] !== ')') {
-    input = trimSpaces(input)
-    /*
-     * Recursively call when it encounters '('
-     */
+    // Recursively call when it encounters '('
     if (input[0] === '(') {
       const result = expressionParser(input)
       arr.push(result[0])
@@ -59,7 +59,11 @@ const expressionParser = input => {
       continue
     }
     let numOutPut = valueParser(input)
-    arr.push(numOutPut[0])
+    if (globalObj.hasOwnProperty(numOutPut[0])) {
+      arr.push(globalObj[numOutPut[0]])
+    } else {
+      arr.push(numOutPut[0])
+    }
     input = numOutPut[1]
     input = trimSpaces(input)
   }
@@ -108,17 +112,15 @@ const ifParser = input => {
   }
   input = input.slice(2)
   input = trimSpaces(input)
-  /**
-   *Evaluating the condition of if expression
-   */
-  let condition = valueParser(input)
+
+  // Evaluating the condition of if expression
+  let condition = expressionParser(input)
   input = condition[1]
   let result
   let ifCondition = extractExpression(trimSpaces(input))
   let elseCondition = extractExpression(trimSpaces(ifCondition[1]))
-  /**
-   * When there is no else block statement
-   */
+
+  // When there is no else block statement
   input = trimSpaces(ifCondition[1])
 
   if (elseCondition) {
@@ -127,15 +129,12 @@ const ifParser = input => {
   if (input[0] === ')') {
     input = input.slice(1)
   }
-  /**
-   * Executing true block statement
-   */
+
+  // Executing true block statement
   if (condition[0] === true) {
     result = allParser(ifCondition[0])
   }
-  /**
-   * Executing false block statement
-   */
+  // Executing false block statement
   else {
     if (!elseCondition) {
       return null
@@ -143,6 +142,56 @@ const ifParser = input => {
     result = allParser(elseCondition[0])
   }
   return [result[0], input]
+}
+
+const symbolParser = input => {
+  let regexSym = (/^[a-zA-Z]+/)
+  let symbol = input.match(regexSym)
+  if (symbol && globalObj.hasOwnProperty(symbol[0])) {
+    return [globalObj[symbol[0]], input.slice(symbol[0].length)]
+  } else if (symbol) {
+    return [symbol[0], input.slice(symbol[0].length)]
+  }
+  return null
+}
+
+/*
+*parsing the define expression
+*/
+const defineParser = input => {
+  if (!input.startsWith('(')) {
+    return null
+  }
+  input = input.slice(1)
+  input = trimSpaces(input)
+  if (!input.startsWith('define')) {
+    return null
+  }
+  input = input.slice(6)
+  input = trimSpaces(input)
+  let result
+  // checking for symbol
+  let symbol = symbolParser(input)
+  if (!symbol) {
+    return 'Error: define: symbol or pair expected but got undefined []'
+  }
+
+  input = trimSpaces(symbol[1])
+  // checking for value and saving it to globalObj
+  let value = valueParser(input)
+  input = trimSpaces(value[1].slice(1))
+  if (value) {
+    globalObj[symbol[0]] = value[0]
+  } else {
+    globalObj[symbol[0]] = ''
+  }
+
+  if (input) {
+    result = valueParser(input)
+    return [result[0], result[1]]
+  }
+
+  return [globalObj, input]
 }
 
 const factoryParser = (...parsers) => {
@@ -156,16 +205,18 @@ const factoryParser = (...parsers) => {
     return null
   }
 }
-const valueParser = factoryParser(numberParser, expressionParser)
-const specialParser = factoryParser(ifParser)
-const allParser = factoryParser(numberParser, expressionParser, ifParser)
+const valueParser = factoryParser(numberParser, expressionParser, symbolParser)
+const allParser = factoryParser(numberParser, expressionParser, ifParser, defineParser, symbolParser)
 
+/**
+ *parsing all parsers
+*/
 const parse = (input) => {
   let result
   while (input && input.startsWith('(')) {
     result = allParser(input)
     if (!result) {
-      return null
+      return 'Invalid'
     }
     input = trimSpaces(result[1])
   }
@@ -189,3 +240,11 @@ const parse = (input) => {
 // console.log(parse('(if (< 1 2) (if (< 2 1) (+ 1 2 3 4) (+ 3 3)))'))
 // console.log(parse('(if (< 1 2) (if (< 2 1) (+ 1 1) (+ 3 3)) (+ 4 4))'))
 // console.log(parse('(if (<= 1 2) (if (<= 2 2) (+ 1 1) (+ 3 3)) (+ 4 4))'))
+// console.log(parse('(define r 4)'))
+// console.log(parse('(define)'))
+console.log(parse('(define lamda 10)'))
+// console.log(parse('(define r 10) r'))
+// // console.log(parse('(define k 8)(* k k)'))
+// console.log(parse('(define k 8)(* r r)'))
+// console.log(parse('(define k 8)(* r)'))
+// console.log(parse('(define k 10)'))

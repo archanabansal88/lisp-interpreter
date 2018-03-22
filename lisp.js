@@ -66,8 +66,7 @@ const expressionParser = input => {
     } else {
       arr.push(numOutPut[0])
     }
-    input = numOutPut[1]
-    input = trimSpaces(input)
+    input = trimSpaces(numOutPut[1])
   }
 
   if (input[0] === ')') {
@@ -107,16 +106,14 @@ const ifParser = input => {
   if (!input.startsWith('(')) {
     return null
   }
-  input = input.slice(1)
-  input = trimSpaces(input)
+  input = trimSpaces(input.slice(1))
   if (!input.startsWith('if')) {
     return null
   }
-  input = input.slice(2)
-  input = trimSpaces(input)
+  input = trimSpaces(input.slice(2))
 
   // Evaluating the condition of if expression
-  let condition = expressionParser(input)
+  let condition = valueParser(input)
   input = condition[1]
   let result
   let ifCondition = extractExpression(trimSpaces(input))
@@ -160,13 +157,11 @@ const defineParser = input => {
   if (!input.startsWith('(')) {
     return null
   }
-  input = input.slice(1)
-  input = trimSpaces(input)
+  input = trimSpaces(input.slice(1))
   if (!input.startsWith('define')) {
     return null
   }
-  input = input.slice(6)
-  input = trimSpaces(input)
+  input = trimSpaces(input.slice(6))
   let value
   // checking for symbol
   let symbol = symbolParser(input)
@@ -175,7 +170,7 @@ const defineParser = input => {
   }
   input = trimSpaces(symbol[1])
 
-  // checking for value and saving it to globalObj
+  // checking for value(either lambda or simple expression) and saving it to globalObj
   value = lambdaParser(input)
   if (!value) {
     value = valueParser(input)
@@ -259,6 +254,7 @@ const parse = (input) => {
   return result
 }
 
+exports.lisp = parse
 // console.log(expressionParser('(+ 8 1 0 9 0)'))
 // console.log(expressionParser('(+ 2 3 5)'))
 // console.log(expressionParser('(- 4 3 1)'))
@@ -286,3 +282,5 @@ const parse = (input) => {
 // console.log(parse('(define k 10)'))
 // console.log(parse('(define add (lambda (x y) (+ x y)))'))
 // console.log(parse('(lambda (x) (+ x x))'))
+// console.log(parse('(lambda (x) (lambda (x) (+ x x)))'))
+// console.log(parse('(define k 10)'))

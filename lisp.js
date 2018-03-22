@@ -135,9 +135,7 @@ const ifParser = input => {
   // Executing true block statement
   if (condition[0] === true) {
     result = allParser(ifCondition[0])
-  }
-  // Executing false block statement
-  else {
+  } else { // Executing false block statement
     if (!elseCondition) {
       return null
     }

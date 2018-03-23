@@ -61,7 +61,6 @@ const expressionParser = (input) => {
       input = trimSpaces(result[1])
       continue
     }
-
     let numOutPut = valueParser(input)
     if (globalObj.hasOwnProperty(numOutPut[0])) {
       arr.push(globalObj[numOutPut[0]])
@@ -75,28 +74,6 @@ const expressionParser = (input) => {
     input = input.slice(1)
   }
   return [currentOperator(arr), input]
-}
-
-const callParser = input => {
-  if (input[0] !== '(') {
-    return null
-  }
-  const fn = getArguments(input)
-  const [fnName, ...values] = fn[0]
-  if (!(fnName in globalObj)) {
-    return null
-  }
-
-  const obj = globalObj[fnName]
-  if (obj.args.length !== values.length) {
-    throw new Error('arguments mismatch')
-  }
-  obj.args.forEach((value, index) => {
-    obj[value] = values[index]
-  })
-
-  var result = funcEvaluator(obj)
-  return [result, trimSpaces(fn[1])]
 }
 
 /**
@@ -155,7 +132,7 @@ const ifParser = (input) => {
     result = allParser(ifCondition[0])
   } else { // Executing false block statement
     if (!elseCondition) {
-      return null
+      throw new Error('Else Condition not defined')
     }
     result = allParser(elseCondition[0])
   }
@@ -199,12 +176,12 @@ const defineParser = input => {
     globalObj[symbol[0]] = ''
   }
   input = trimSpaces(value[1].slice(1))
-  return [globalObj, input]
+  return ['', input]
 }
 
 /**
- * parsing Lambda expression
- */
+ * parsing lambda expression
+*/
 const lambdaParser = input => {
   // checking if input starts with '(lambda' or '((lambda'
   let regex = /^((\(\s*)\(?(\s*)lambda )/
@@ -223,14 +200,19 @@ const lambdaParser = input => {
   let bodyExp = extractExpression(trimSpaces(input))
   input = trimSpaces(bodyExp[1])
 
+  if (input[0] !== ')') {
+    throw new Error('Invalid Lambda expression')
+  }
+  input = trimSpaces(input.slice('1'))
+
   // Extracting the values if self invoking
-  if (input[0] !== ')' && input[0] !== '(') {
-    input = trimSpaces(input.slice(1))
+  if (input[0] !== ')') {
     while (input[0] !== ')') {
       const num = numberParser(input)
       values.push(num[0])
       input = trimSpaces(num[1])
     }
+
     if (arg[0].length !== values.length) {
       throw new Error('arguments mismatch')
     }
@@ -240,7 +222,7 @@ const lambdaParser = input => {
   }
   // Mapping the argument with the respective values
   const result = context(bodyExp[0], arg[0], values, globalObj)
-  return [result, input.slice(1)]
+  return [result, input]
 }
 
 /**
@@ -306,13 +288,34 @@ const funcEvaluator = (obj) => {
   const symbols = extractSymbol(obj.fnBody)
   symbols.forEach((value) => {
     const argValue = obj.find(value)
-    if (argValue) {
-      const regex = new RegExp(value, 'g')
-      obj.fnBody = obj.fnBody.replace(regex, argValue)
+    if (!argValue) {
+      throw new Error(value + ' is not defined')
     }
+    const regex = new RegExp(value, 'g')
+    obj.fnBody = obj.fnBody.replace(regex, argValue)
   })
   const result = allParser(obj.fnBody)
   return result[0]
+}
+
+const callParser = input => {
+  if (input[0] !== '(') {
+    return null
+  }
+  const fn = getArguments(input)
+  const [fnName, ...values] = fn[0]
+  if (!(fnName in globalObj)) {
+    return null
+  }
+  const obj = globalObj[fnName]
+  if (obj.args.length !== values.length) {
+    throw new Error('arguments mismatch')
+  }
+  obj.args.forEach((value, index) => {
+    obj[value] = values[index]
+  })
+  var result = funcEvaluator(obj)
+  return [result, trimSpaces(fn[1])]
 }
 
 const factoryParser = (...parsers) => {
@@ -327,7 +330,7 @@ const factoryParser = (...parsers) => {
   }
 }
 const valueParser = factoryParser(numberParser, expressionParser, symbolParser)
-const allParser = factoryParser(numberParser, expressionParser, ifParser, defineParser, lambdaParser, symbolParser, callParser)
+const allParser = factoryParser(numberParser, ifParser, expressionParser, defineParser, lambdaParser, symbolParser, callParser)
 
 /**
  *parsing all parsers
@@ -349,39 +352,36 @@ const parse = (input) => {
 }
 
 exports.lisp = parse
-// console.log(expressionParser('(+ 8 1 0 9 0)'))
-// console.log(expressionParser('(+ 2 3 5)'))
-// console.log(expressionParser('(- 4 3 1)'))
-// console.log(expressionParser('(* 2 3 2)'))
-// console.log(expressionParser('(/ 4 2 2)'))
-// console.log(expressionParser('(1 2)'))
-// console.log(expressionParser('(+ (+ 1 2) (+ 3 4) 87)'))
-// console.log(expressionParser('(- (+ 1 2 9 9) (* 3 4) 87)'))
+
+// console.log(parse('(+ 8 1 0 9 0)'))
+// console.log(parse('(+ 2 3 5)'))
+// console.log(parse('(- 4 3 1)'))
+// console.log(parse('(* 2 3 2)'))
+// console.log(parse('(/ 4 2 2)'))
+// console.log(parse('(1 2)'))
+// console.log(parse('(+ (+ 1 2) (+ 3 4) 87)'))
+// console.log(parse('(- (+ 1 2 9 9) (* 3 4) 87)'))
 // console.log(parse('(+ (* 6 9) (/ 9 4) 9)'))
 // console.log(parse('(min 1 8 3 4 5)'))
-// console.log(parse('(+ (* 6 9) (/ 9 4) 9)'))
+
 // console.log(parse('(if (<= 1 1) (+ 2 2) (+ 1 1))'))
 // console.log(parse('(if (< 1 2) (+ 6 9) (+ 9 4))'))
 // console.log(parse('(if (> 1 2) (+ 6 9) (+ 9 4))'))
 // console.log(parse('(if (> 10 20) (+ 1 1) (+ 3 3)) (if (< 10 20) (+ 1 1) (+ 3 3))'))
-// console.log(parse('(if (< 1 2) (if (< 2 1) (+ 1 2 3 4) (+ 3 3)))'))
+// console.log(parse('(if (> 1 2) (if (< 2 1) (+ 1 2 3 4) (+ 3 3)))'))
 // console.log(parse('(if (< 1 2) (if (< 2 1) (+ 1 1) (+ 3 3)) (+ 4 4))'))
 // console.log(parse('(if (<= 1 2) (if (<= 2 2) (+ 1 1) (+ 3 3)) (+ 4 4))'))
+// console.log(parse('(if (< 20 10) (if (< 20 10) (+ 4 4) (+ 5 5)) (if (> 20 10) (if (< 20 10) (if (< 20 10) (+ 4 4) (+ 5 5)) (if (> 20 10) (+ 4 4) (+ 5 5))) (+ 5 5)))'))
+
 // console.log(parse('(define r 4)'))
 // console.log(parse('(define)'))
 // console.log(parse('(define lamda 10)'))
-// console.log(parse('(define r 10) r'))
+// console.log(parse('(define r 10)r'))
 // console.log(parse('(define k 8)(* k k)'))
-// console.log(parse('(define k 8)(* r r)'))
 // console.log(parse('(define k 8)(* r)'))
 // console.log(parse('(define k 10)'))
-// console.log(parse('(define add (lambda (x y) (* x y k)))'))
+// console.log(parse('(define add (lambda (x y) (* x y)))'))
 // console.log(parse('(add 6 8)'))
-// console.log(parse('(lambda (x) (+ x x))'))
-// console.log(parse('(lambda (x) (lambda (x) (+ x x)))'))
+// console.log(parse('((lambda (x) (+ x x))4)'))
 // console.log(parse('(define k 10)'))
-// console.log(parse('((lambda (z) (+ k z y))2 4)'))
-// console.log(parse('(if (< 20 10) (if (< 20 10) (+ 4 4) (+ 5 5)) (if (> 20 10) (if (< 20 10) (if (< 20 10) (+ 4 4) (+ 5 5)) (if (> 20 10) (+ 4 4) (+ 5 5))) (+ 5 5)))'))
-// console.log(parse('((lambda (i k) ((lambda (j) (+ j k)) 25)) 1 3)'))
-// console.log(parse('(define fact (lambda (n) (if (<= n 1) (1) (* n (fact (- n 1) ) ) ) ) )'))
-// console.log('(fact 10)')
+// console.log(parse('((lambda (z y) (+ k z y))2 4)'))

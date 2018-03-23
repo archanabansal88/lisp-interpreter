@@ -338,14 +338,18 @@ const allParser = factoryParser(numberParser, ifParser, expressionParser, define
 const parse = (input) => {
   try {
     let result
-    while (input && input.startsWith('(')) {
+    while (input.length > 0 && input.startsWith('(')) {
       result = allParser(input)
       if (!result) {
         return 'Invalid'
       }
       input = trimSpaces(result[1])
     }
-    return result[0]
+    if (result) {
+      return result[0]
+    } else {
+      return ''
+    }
   } catch (e) {
     return e.message || 'Invalid'
   }

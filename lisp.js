@@ -40,8 +40,7 @@ const operators = {
 /**
  * Checking for simple and nested expression
 */
-const expressionParser = input => {
-  console.log(input)
+const expressionParser = (input) => {
   if (input[0] !== '(') {
     return null
   }
@@ -59,7 +58,7 @@ const expressionParser = input => {
     if (input[0] === '(') {
       const result = expressionParser(input)
       arr.push(result[0])
-      input = result[1]
+      input = trimSpaces(result[1])
       continue
     }
 
@@ -76,6 +75,28 @@ const expressionParser = input => {
     input = input.slice(1)
   }
   return [currentOperator(arr), input]
+}
+
+const callParser = input => {
+  if (input[0] !== '(') {
+    return null
+  }
+  const fn = getArguments(input)
+  const [fnName, ...values] = fn[0]
+  if (!(fnName in globalObj)) {
+    return null
+  }
+
+  const obj = globalObj[fnName]
+  if (obj.args.length !== values.length) {
+    throw new Error('arguments mismatch')
+  }
+  obj.args.forEach((value, index) => {
+    obj[value] = values[index]
+  })
+
+  var result = funcEvaluator(obj)
+  return [result, trimSpaces(fn[1])]
 }
 
 /**
@@ -105,7 +126,7 @@ const extractExpression = input => {
 /**
  *parsing the if expression
  */
-const ifParser = input => {
+const ifParser = (input) => {
   if (!input.startsWith('(')) {
     return null
   }
@@ -171,11 +192,7 @@ const defineParser = input => {
   input = trimSpaces(symbol[1])
 
   // checking for value(either lambda or simple expression) and saving it to globalObj
-  value = lambdaParser(input)
-  if (!value) {
-    value = valueParser(input)
-  }
-
+  value = lambdaParser(input) || valueParser(input)
   if (value) {
     globalObj[symbol[0]] = value[0]
   } else {
@@ -204,18 +221,25 @@ const lambdaParser = input => {
 
   // Extracting the body of lambda expression
   let bodyExp = extractExpression(trimSpaces(input))
-  input = bodyExp[1]
+  input = trimSpaces(bodyExp[1])
 
   // Extracting the values if self invoking
-  if (input[0] === ')' && (trimSpaces(input[0 + 1]))) {
-    input = input.slice(1)
+  if (input[0] !== ')' && input[0] !== '(') {
+    input = trimSpaces(input.slice(1))
     while (input[0] !== ')') {
-      values.push(input[0])
-      input = trimSpaces(input.slice(1))
+      const num = numberParser(input)
+      values.push(num[0])
+      input = trimSpaces(num[1])
     }
+    if (arg[0].length !== values.length) {
+      throw new Error('arguments mismatch')
+    }
+    const fnObj = context(bodyExp[0], arg[0], values, globalObj)
+    const result = funcEvaluator(fnObj)
+    return [result, input.slice(1)]
   }
   // Mapping the argument with the respective values
-  let result = context(bodyExp[0], arg[0], values, globalObj)
+  const result = context(bodyExp[0], arg[0], values, globalObj)
   return [result, input.slice(1)]
 }
 
@@ -228,13 +252,13 @@ const context = (fnBody, args, values, parent) => {
     current[arg] = values[index]
     return current
   }, {})
-
   const fn = {
-    fnBody: fnBody,
-    parent: parent,
+    args,
+    fnBody,
+    parent,
     find: function (key) {
       if (this[key]) return this[key]
-      return this.parent.find(key)
+      return (this.parent.hasOwnProperty('find') && this.parent.find(key)) || this.parent[key]
     }
   }
   return Object.assign({}, param, fn)
@@ -261,6 +285,36 @@ const getArguments = input => {
   return [arg, input.slice(1)]
 }
 
+const extractSymbol = (input) => {
+  let arr = []
+  while (input) {
+    const symbols = symbolParser(trimSpaces(input))
+    if (symbols) {
+      var keyword = ['if', 'lambda', 'define', 'min', 'max']
+      if (keyword.indexOf(symbols[0]) === -1) {
+        arr.push(symbols[0])
+      }
+      input = symbols[1]
+    } else {
+      input = input.slice(1)
+    }
+  }
+  return arr
+}
+
+const funcEvaluator = (obj) => {
+  const symbols = extractSymbol(obj.fnBody)
+  symbols.forEach((value) => {
+    const argValue = obj.find(value)
+    if (argValue) {
+      const regex = new RegExp(value, 'g')
+      obj.fnBody = obj.fnBody.replace(regex, argValue)
+    }
+  })
+  const result = allParser(obj.fnBody)
+  return result[0]
+}
+
 const factoryParser = (...parsers) => {
   return function (input) {
     for (let value of parsers) {
@@ -273,21 +327,25 @@ const factoryParser = (...parsers) => {
   }
 }
 const valueParser = factoryParser(numberParser, expressionParser, symbolParser)
-const allParser = factoryParser(numberParser, expressionParser, ifParser, defineParser, lambdaParser, symbolParser)
+const allParser = factoryParser(numberParser, expressionParser, ifParser, defineParser, lambdaParser, symbolParser, callParser)
 
 /**
  *parsing all parsers
 */
 const parse = (input) => {
-  let result
-  while (input && input.startsWith('(')) {
-    result = allParser(input)
-    if (!result) {
-      return 'Invalid'
+  try {
+    let result
+    while (input && input.startsWith('(')) {
+      result = allParser(input)
+      if (!result) {
+        return 'Invalid'
+      }
+      input = trimSpaces(result[1])
     }
-    input = trimSpaces(result[1])
+    return result[0]
+  } catch (e) {
+    return e.message || 'Invalid'
   }
-  return result[0]
 }
 
 exports.lisp = parse
@@ -299,7 +357,7 @@ exports.lisp = parse
 // console.log(expressionParser('(1 2)'))
 // console.log(expressionParser('(+ (+ 1 2) (+ 3 4) 87)'))
 // console.log(expressionParser('(- (+ 1 2 9 9) (* 3 4) 87)'))
-// console.log(expressionParser('(+ (* 6 9) (/ 9 4) 9)'))
+// console.log(parse('(+ (* 6 9) (/ 9 4) 9)'))
 // console.log(parse('(min 1 8 3 4 5)'))
 // console.log(parse('(+ (* 6 9) (/ 9 4) 9)'))
 // console.log(parse('(if (<= 1 1) (+ 2 2) (+ 1 1))'))
@@ -317,9 +375,13 @@ exports.lisp = parse
 // console.log(parse('(define k 8)(* r r)'))
 // console.log(parse('(define k 8)(* r)'))
 // console.log(parse('(define k 10)'))
-// console.log(parse('(define add (lambda (x y) (+ x y)))'))
+// console.log(parse('(define add (lambda (x y) (* x y k)))'))
+// console.log(parse('(add 6 8)'))
 // console.log(parse('(lambda (x) (+ x x))'))
 // console.log(parse('(lambda (x) (lambda (x) (+ x x)))'))
 // console.log(parse('(define k 10)'))
-// console.log(parse('((lambda (k y) (+ k y))2 4)'))
+// console.log(parse('((lambda (z) (+ k z y))2 4)'))
 // console.log(parse('(if (< 20 10) (if (< 20 10) (+ 4 4) (+ 5 5)) (if (> 20 10) (if (< 20 10) (if (< 20 10) (+ 4 4) (+ 5 5)) (if (> 20 10) (+ 4 4) (+ 5 5))) (+ 5 5)))'))
+// console.log(parse('((lambda (i k) ((lambda (j) (+ j k)) 25)) 1 3)'))
+// console.log(parse('(define fact (lambda (n) (if (<= n 1) (1) (* n (fact (- n 1) ) ) ) ) )'))
+// console.log('(fact 10)')

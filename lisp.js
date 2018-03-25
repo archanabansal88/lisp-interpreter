@@ -36,7 +36,7 @@ const operators = {
   '<': args => comparator(args, '<'),
   '>=': args => comparator(args, '>='),
   '<=': args => comparator(args, '<='),
-  '=': args => comparator(args, '==='),
+  '=': args => comparator(args, '='),
   'max': args => Math.max(...args),
   'min': args => Math.min(...args)
 }
@@ -76,7 +76,7 @@ const expressionParser = (input, scope) => {
   while (input[0] !== ')') {
     // Recursively call when it encounters '('
     if (input[0] === '(') {
-      const result = expressionParser(input, scope)
+      const result = allParser(input, scope)
       arr.push(result[0])
       input = trimSpaces(result[1])
       continue
@@ -133,11 +133,9 @@ const ifParser = (input, scope) => {
   if (elseCondition) {
     input = trimSpaces(elseCondition[1])
   }
-
   if (input[0] !== ')') {
     throw new Error('invalid if syntax')
   }
-
   // Executing true block statement
   if (condition[0] === true) {
     result = allParser(ifCondition[0], scope)
@@ -377,18 +375,23 @@ exports.lisp = parse
 // console.log(parse('(twice (- k 3))'))
 
 // console.log(parse('(define y 5)'))
-// console.log(parse('(define l 5)'))
-// console.log(parse('(define z 1)'))
 // console.log(parse('(define add (lambda (x) (+ x x)))'))
 // console.log(parse('(add 10)'))
 // console.log(parse('((lambda (x) (+ x y)) 1)'))
 // console.log(parse('((lambda (a b) (if(> a b) (+ a a) (+ b b))) 10 20)'))
 // console.log(parse('((lambda (n m) (if(> n m) (add n) (add m))) 12 14)'))
 // console.log(parse('((lambda (i k) (lambda (i) (+ i k y))) 77 77)'))
-// console.log(parse('((lambda (i k) ((lambda (i) (+ i k y)) 1)) 2 3)'))
+// console.log(parse('((lambda (i k) ((lambda (i k) (+ i k)) 1 9)) 2 3)'))
 
 // console.log(parse('(> 6 3 5 2 1)'))
 // console.log(parse('(> 4 3 1)'))
 // console.log(parse('(< 1 4 2)'))
 // console.log(parse('(< 2 3 4)'))
 // console.log(parse('(>= 4 3 2 )'))
+
+// console.log(parse('(define fac (lambda (n) (if (= n 0) (+ 0 1) (* n (fac (- n 1))))))'))
+// console.log(parse('(fac 10)'))
+// console.log(parse('(define fib (lambda (n)(if (= n 0) 0 (if (= n 1) 1(+ (fib (- n 1)) (fib (- n 2)))))))'))
+// console.log(parse('(fib 10)'))
+// console.log(parse('(define one 1)'))
+// console.log(parse('(if (= one 2) (+ one 1) (- one 1))'))

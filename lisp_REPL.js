@@ -1,5 +1,6 @@
 const source = require('./lisp.js')
-let myRepl = require('repl')
+const myRepl = require('repl')
+
 myRepl.start({
   prompt: '> ',
   ignoreUndefined: true,

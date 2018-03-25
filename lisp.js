@@ -61,7 +61,7 @@ const comparator = (arr, operator) => {
 /**
  * Checking for simple and nested expression
 */
-const expressionParser = (input, env) => {
+const expressionParser = (input, scope) => {
   const expr = regexParser(input, regex.exp)
   if (!expr) { return null }
   input = expr[1]
@@ -76,13 +76,13 @@ const expressionParser = (input, env) => {
   while (input[0] !== ')') {
     // Recursively call when it encounters '('
     if (input[0] === '(') {
-      const result = expressionParser(input)
+      const result = expressionParser(input, scope)
       arr.push(result[0])
       input = trimSpaces(result[1])
       continue
     }
     const numOutPut = valueParser(input)
-    const value = getValue(numOutPut[0], env)
+    const value = getValue(numOutPut[0], scope)
     arr.push(value)
     input = trimSpaces(numOutPut[1])
   }
@@ -118,13 +118,13 @@ const extractExpression = input => {
 /**
  *parsing the if expression
  */
-const ifParser = (input, env) => {
+const ifParser = (input, scope) => {
   const exp = regexParser(input, regex.if)
   if (!exp) { return null }
   input = exp[1]
   let result
   // Evaluating the condition of if expression
-  const condition = valueParser(input, env)
+  const condition = valueParser(input, scope)
   const ifCondition = extractExpression(trimSpaces(condition[1]))
   const elseCondition = extractExpression(trimSpaces(ifCondition[1]))
   // When there is no else block statement
@@ -140,12 +140,12 @@ const ifParser = (input, env) => {
 
   // Executing true block statement
   if (condition[0] === true) {
-    result = allParser(ifCondition[0], env)
+    result = allParser(ifCondition[0], scope)
   } else { // Executing false block statement
     if (!elseCondition) {
       throw new Error('Else Condition not defined')
     }
-    result = allParser(elseCondition[0], env)
+    result = allParser(elseCondition[0], scope)
   }
   return [result[0], input.slice(1)]
 }
@@ -257,7 +257,7 @@ const funcEvaluator = (obj) => {
   return result[0]
 }
 
-const callParser = (input, env) => {
+const callParser = (input, scope) => {
   if (input[0] !== '(') {
     return null
   }
@@ -271,15 +271,18 @@ const callParser = (input, env) => {
     throw new Error('arguments mismatch')
   }
   obj.args.forEach((value, index) => {
-    obj[value] = getValue(values[index], env)
+    obj[value] = getValue(values[index], scope)
   })
   const result = funcEvaluator(obj)
   return [result, trimSpaces(fn[1])]
 }
 
-const getValue = (value, env) => {
-  if (env) {
-    return env.find(value)
+const getValue = (value, scope) => {
+  if (scope) {
+    const val = scope.find(value)
+    if (val) {
+      return val
+    }
   }
   if (globalObj.hasOwnProperty(value)) {
     return globalObj[value]
@@ -288,9 +291,9 @@ const getValue = (value, env) => {
 }
 
 const factoryParser = (...parsers) => {
-  return function (input, env) {
+  return function (input, scope) {
     for (const value of parsers) {
-      const valueOutput = value(input, env)
+      const valueOutput = value(input, scope)
       if (valueOutput) {
         return valueOutput
       }
@@ -368,6 +371,11 @@ exports.lisp = parse
 // console.log(parse('(define add (lambda (i k) ((lambda (i) (+ i k y))14) ))'))
 // console.log(parse('(add 1 2)'))
 
+// console.log(parse('(define circlearea (lambda (r) (* 3.14159 (* r r))))'))
+// console.log(parse('(circlearea 3)'))
+// console.log(parse('(define twice (lambda (x) (* 2 x)))'))
+// console.log(parse('(twice (- k 3))'))
+
 // console.log(parse('(define y 5)'))
 // console.log(parse('(define l 5)'))
 // console.log(parse('(define z 1)'))
@@ -379,8 +387,8 @@ exports.lisp = parse
 // console.log(parse('((lambda (i k) (lambda (i) (+ i k y))) 77 77)'))
 // console.log(parse('((lambda (i k) ((lambda (i) (+ i k y)) 1)) 2 3)'))
 
-console.log(parse('(> 6 3 5 2 1)'))
-console.log(parse('(> 4 3 1)'))
-console.log(parse('(< 1 4 2)'))
-console.log(parse('(< 2 3 4)'))
-console.log(parse('(>= 4 3 2 )'))
+// console.log(parse('(> 6 3 5 2 1)'))
+// console.log(parse('(> 4 3 1)'))
+// console.log(parse('(< 1 4 2)'))
+// console.log(parse('(< 2 3 4)'))
+// console.log(parse('(>= 4 3 2 )'))

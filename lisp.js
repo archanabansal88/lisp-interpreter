@@ -1,26 +1,32 @@
 var globalObj = {}
 
-const numberParser = input => {
-  let regexNum = /^(?:-)?(?:0|\d+)(?:\.\d+)?(?:(?:e|E)(?:\+|-)?\d+)?/
-  let num = input.match(regexNum)
-  if (num) {
-    return [parseFloat(num[0]), input.slice(num[0].length)]
-  }
-  return null
+const regex = {
+  space: /^\s+/,
+  number: /^(?:-)?(?:0|\d+)(?:\.\d+)?(?:(?:e|E)(?:\+|-)?\d+)?/,
+  symbol: /^[a-zA-Z]+/,
+  if: /^((\(\s*)if )/,
+  define: /^((\(\s*)define )/,
+  lambda: /^((\(\s*)\(?(\s*)lambda )/,
+  exp: /^(\(\s*)/
 }
 
-const spaceParser = input => {
-  let regexSpace = /^\s+/
-  let space = input.match(regexSpace)
-  return space ? [space[0], input.slice(space[0].length)] : null
+const spaceParser = input => regexParser(input, regex.space)
+
+const symbolParser = input => regexParser(input, regex.symbol)
+
+const regexParser = (input, regex) => {
+  const matched = input.match(regex)
+  return matched ? [matched[0], input.slice(matched[0].length)] : null
+}
+
+const numberParser = input => {
+  const num = regexParser(input, regex.number)
+  return num ? [parseFloat(num[0]), num[1]] : null
 }
 
 const trimSpaces = input => {
-  let spaceOutput = spaceParser(input)
-  if (spaceOutput) {
-    input = spaceOutput[1]
-  }
-  return input
+  const spaceOutput = spaceParser(input)
+  return spaceOutput ? spaceOutput[1] : input
 }
 
 const operators = {
@@ -28,24 +34,40 @@ const operators = {
   '-': args => args.reduce((a, b) => a - b),
   '*': args => args.reduce((a, b) => a * b),
   '/': args => args.reduce((a, b) => a / b),
-  '>': args => args.reduce((a, b) => a > b),
-  '<': args => args.reduce((a, b) => a < b),
-  '>=': args => args.reduce((a, b) => a >= b),
-  '<=': args => args.reduce((a, b) => a <= b),
-  '=': args => args.reduce((a, b) => a === b),
+  '>': args => comparator(args, '>'),
+  '<': args => comparator(args, '<'),
+  '>=': args => comparator(args, '>='),
+  '<=': args => comparator(args, '<='),
+  '=': args => comparator(args, '==='),
   'max': args => Math.max(...args),
   'min': args => Math.min(...args)
+}
+
+const comparision = {
+  '>': (a, b) => a > b,
+  '<': (a, b) => a < b,
+  '>=': (a, b) => a >= b,
+  '<=': (a, b) => a <= b,
+  '=': (a, b) => a === b
+}
+
+const comparator = (arr, operator) => {
+  for (let i = 0; i < arr.length - 1; i++) {
+    if (!comparision[operator](arr[i], arr[i + 1])) {
+      return false
+    }
+  }
+  return true
 }
 
 /**
  * Checking for simple and nested expression
 */
 const expressionParser = (input) => {
-  if (input[0] !== '(') {
-    return null
-  }
+  const expr = regexParser(input, regex.exp)
+  if (!expr) { return null }
+  input = expr[1]
   let arr = []
-  input = trimSpaces(input.slice(1))
   let operator = input.slice(0, input.indexOf(' '))
   let currentOperator = operators[operator]
   if (!currentOperator) {
@@ -99,19 +121,13 @@ const extractExpression = input => {
   }
   return [str, input]
 }
-
 /**
  *parsing the if expression
  */
 const ifParser = (input) => {
-  if (!input.startsWith('(')) {
-    return null
-  }
-  input = trimSpaces(input.slice(1))
-  if (!input.startsWith('if')) {
-    return null
-  }
-  input = trimSpaces(input.slice(2))
+  const exp = regexParser(input, regex.if)
+  if (!exp) { return null }
+  input = exp[1]
   // Evaluating the condition of if expression
   let condition = valueParser(input)
   input = condition[1]
@@ -139,27 +155,13 @@ const ifParser = (input) => {
   return [result[0], input]
 }
 
-const symbolParser = input => {
-  let regexSym = (/^[a-zA-Z]+/)
-  let symbol = input.match(regexSym)
-  if (symbol) {
-    return [symbol[0], input.slice(symbol[0].length)]
-  }
-  return null
-}
-
 /*
 *parsing the define expression
 */
 const defineParser = input => {
-  if (!input.startsWith('(')) {
-    return null
-  }
-  input = trimSpaces(input.slice(1))
-  if (!input.startsWith('define')) {
-    return null
-  }
-  input = trimSpaces(input.slice(6))
+  const exp = regexParser(input, regex.define)
+  if (!exp) { return null }
+  input = exp[1]
   let value
   // checking for symbol
   let symbol = symbolParser(input)
@@ -183,15 +185,10 @@ const defineParser = input => {
  * parsing lambda expression
 */
 const lambdaParser = input => {
-  // checking if input starts with '(lambda' or '((lambda'
-  let regex = /^((\(\s*)\(?(\s*)lambda )/
-  let exp = input.match(regex)
-  if (!exp) {
-    return null
-  }
-  input = input.slice(exp[0].length)
+  let exp = regexParser(input, regex.lambda)
+  if (!exp) { return null }
+  input = exp[1]
   let values = []
-
   // Extracting the arguments of lambda expression
   let arg = getArguments(trimSpaces(input))
   input = arg[1]
@@ -250,10 +247,9 @@ const context = (fnBody, args, values, parent) => {
  * Getting arguments of Lambda expression
  */
 const getArguments = input => {
-  if (!input.startsWith('(')) {
-    return null
-  }
-  input = trimSpaces(input.slice(1))
+  const expr = regexParser(input, regex.exp)
+  if (!expr) { return null }
+  input = expr[1]
   let ele
   let arg = []
   while (input[0] !== ')') {
@@ -336,30 +332,29 @@ const allParser = factoryParser(numberParser, ifParser, expressionParser, define
  *parsing all parsers
 */
 const parse = (input) => {
-  try {
-    let result
-    while (input.length > 0 && input.startsWith('(')) {
-      result = allParser(input)
-      if (!result) {
-        return 'Invalid'
-      }
-      input = trimSpaces(result[1])
+  // try {
+  let result
+  while (input.length > 0 && input.startsWith('(')) {
+    result = allParser(input)
+    if (!result) {
+      return 'Invalid'
     }
-    if (result) {
-      return result[0]
-    } else {
-      return ''
-    }
-  } catch (e) {
-    return e.message || 'Invalid'
+    input = trimSpaces(result[1])
   }
+  if (result) {
+    return result[0]
+  } else {
+    return ''
+  }
+  // } catch (e) {
+  //   return e.message || 'Invalid'
+  // }
 }
 
 exports.lisp = parse
 
 // console.log(parse('(+ 8 1 0 9 0)'))
 // console.log(parse('(+ 2 3 5)'))
-// console.log(parse('(- 4 3 1)'))
 // console.log(parse('(* 2 3 2)'))
 // console.log(parse('(/ 4 2 2)'))
 // console.log(parse('(1 2)'))
@@ -389,3 +384,9 @@ exports.lisp = parse
 // console.log(parse('((lambda (x) (+ x x))4)'))
 // console.log(parse('(define k 10)'))
 // console.log(parse('((lambda (z y) (+ k z y))2 4)'))
+
+// console.log(parse('(> 6 3 5 2 1)'))
+// console.log(parse('(> 4 3 1)'))
+// console.log(parse('(< 1 4 2)'))
+// console.log(parse('(< 2 3 4)'))
+// console.log(parse('(>= 4 3 2 )'))

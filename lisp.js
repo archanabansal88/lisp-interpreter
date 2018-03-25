@@ -1,4 +1,5 @@
 const globalObj = {}
+
 const regex = {
   space: /^\s+/,
   number: /^(?:-)?(?:0|\d+)(?:\.\d+)?(?:(?:e|E)(?:\+|-)?\d+)?/,
@@ -193,16 +194,16 @@ const lambdaParser = (input, scope) => {
   // Extracting the values if self invoking
   if (input && input[0] !== ')') {
     while (input[0] !== ')') {
-      const num = numberParser(input)
-      values.push(num[0])
+      const num = valueParser(input, scope)
+      values.push(getValue(num[0], scope))
       input = trimSpaces(num[1])
     }
     if (arg[0].length !== values.length) {
       throw new Error('arguments mismatch')
     }
     const fnObj = context(bodyExp[0], arg[0], values, scope || globalObj)
-    const result = funcEvaluator(fnObj)
-    return [result, input.slice(1)]
+    const result = allParser(fnObj.fnBody, fnObj)
+    return [result[0], input.slice(1)]
   }
   // Mapping the argument with the respective values
   const result = context(bodyExp[0], arg[0], values, scope || globalObj)
@@ -249,11 +250,9 @@ const getArguments = (input, scope) => {
   return [arg, input.slice(1)]
 }
 
-const funcEvaluator = (obj) => {
-  const result = allParser(obj.fnBody, obj)
-  return result[0]
-}
-
+/**
+ * To handle function invokation call
+ */
 const callParser = (input, scope) => {
   if (input[0] !== '(') {
     return null
@@ -263,17 +262,23 @@ const callParser = (input, scope) => {
   if (!(fnName in globalObj)) {
     return null
   }
-  const obj = globalObj[fnName]
-  if (obj.args.length !== values.length) {
-    throw new Error('arguments mismatch')
-  }
+  const _obj = globalObj[fnName]
+  const obj = context(_obj.fnBody, _obj.args, values, scope || globalObj)
   obj.args.forEach((value, index) => {
     obj[value] = getValue(values[index], scope)
   })
-  const result = funcEvaluator(obj)
-  return [result, trimSpaces(fn[1])]
+  if (obj.args.length !== values.length) {
+    throw new Error('arguments mismatch')
+  }
+  const result = allParser(obj.fnBody, obj)
+  return [result[0], trimSpaces(fn[1])]
 }
 
+/**
+ * Get value from local scope if present
+ * else from global if present
+ * otherwise return value if it is a number
+ */
 const getValue = (value, scope) => {
   if (scope) {
     const val = scope.find(value)
@@ -388,10 +393,10 @@ exports.lisp = parse
 // console.log(parse('(define r 10)r'))
 // console.log(parse('(define k 8)(* k k)'))
 // console.log(parse('(define k 8)(* r)'))
-// console.log(parse('(define k 10)'))
+// console.log(parse('(define x 10)'))
 // console.log(parse('(define add (lambda (x y) (* x y)))'))
 // console.log(parse('(add 6 8)'))
-// console.log(parse('(lambda (x) (+ x x))'))
+// console.log(parse('((lambda (x) (+ x x))x)'))
 
 /**
  * define, if, lambda expression(nested and selfinvoking)
@@ -420,5 +425,7 @@ exports.lisp = parse
 /**
  * Recursive lambda expression
  */
-// console.log(parse('(define fac (lambda (n) (if (= n 0) 0 (* n (fac (- n 1))))))'))
+// console.log(parse('(define fac (lambda (n) (if (= n 0) 1 (* n (fac (- n 1))))))'))
 // console.log(parse('(fac 10)'))
+// console.log(parse('(define fib (lambda (n)(if (= n 0) 0 (if (= n 1) 1 (+ (fib (- n 1)) (fib (- n 2)))))))'))
+// console.log(parse('(fib 10)'))

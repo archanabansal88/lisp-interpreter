@@ -83,7 +83,7 @@ const expressionParser = (input, scope) => {
       input = trimSpaces(result[1])
       continue
     }
-    const numOutPut = valueParser(input)
+    const numOutPut = valueParser(input, scope)
     const value = getValue(numOutPut[0], scope)
     arr.push(value)
     input = trimSpaces(numOutPut[1])
@@ -155,7 +155,7 @@ const ifParser = (input, scope) => {
 /*
 *parsing the define expression
 */
-const defineParser = input => {
+const defineParser = (input, scope) => {
   const exp = regexParser(input, regex.define)
   if (!exp) { return null }
   input = exp[1]
@@ -165,9 +165,8 @@ const defineParser = input => {
     throw new Error('Error: define: symbol or pair expected but got undefined []')
   }
   input = trimSpaces(symbol[1])
-
   // checking for value(either lambda or simple expression) and saving it to globalObj
-  const value = lambdaParser(input) || valueParser(input)
+  const value = lambdaParser(input, scope) || valueParser(input, scope)
   globalObj[symbol[0]] = value ? value[0] : ''
   input = trimSpaces(value[1].slice(1))
   return ['', input]
@@ -182,18 +181,15 @@ const lambdaParser = (input, scope) => {
   input = exp[1]
   const values = []
   // Extracting the arguments of lambda expression
-  const arg = getArguments(trimSpaces(input))
+  const arg = getArguments(trimSpaces(input), scope)
   input = arg[1]
-
   // Extracting the body of lambda expression
   const bodyExp = extractExpression(trimSpaces(input))
   input = trimSpaces(bodyExp[1])
-
   if (input[0] !== ')') {
     throw new Error('Invalid Lambda expression')
   }
   input = trimSpaces(input.slice('1'))
-
   // Extracting the values if self invoking
   if (input && input[0] !== ')') {
     while (input[0] !== ')') {
@@ -201,7 +197,6 @@ const lambdaParser = (input, scope) => {
       values.push(num[0])
       input = trimSpaces(num[1])
     }
-
     if (arg[0].length !== values.length) {
       throw new Error('arguments mismatch')
     }
@@ -228,7 +223,7 @@ const context = (fnBody, args, values, parent) => {
     fnBody,
     parent,
     find: function (key) {
-      if (this[key]) return this[key]
+      if (key in this) return this[key]
       return (this.parent.hasOwnProperty('find') && this.parent.find(key)) || this.parent[key]
     }
   }
@@ -238,13 +233,13 @@ const context = (fnBody, args, values, parent) => {
 /**
  * Getting arguments of Lambda expression
  */
-const getArguments = input => {
+const getArguments = (input, scope) => {
   const expr = regexParser(input, regex.exp)
   if (!expr) { return null }
   input = expr[1]
   const arg = []
   while (input[0] !== ')') {
-    const ele = valueParser(input)
+    const ele = valueParser(input, scope)
     if (!ele) {
       return null
     }
@@ -263,7 +258,7 @@ const callParser = (input, scope) => {
   if (input[0] !== '(') {
     return null
   }
-  const fn = getArguments(input)
+  const fn = getArguments(input, scope)
   const [fnName, ...values] = fn[0]
   if (!(fnName in globalObj)) {
     return null
@@ -282,12 +277,15 @@ const callParser = (input, scope) => {
 const getValue = (value, scope) => {
   if (scope) {
     const val = scope.find(value)
-    if (val) {
+    if (typeof val !== 'undefined') {
       return val
     }
   }
   if (globalObj.hasOwnProperty(value)) {
     return globalObj[value]
+  }
+  if (isNaN(value)) {
+    throw new Error(`Symbol ${value} is not defined`)
   }
   return value
 }
@@ -331,6 +329,9 @@ const parse = (input) => {
 
 exports.lisp = parse
 
+/**
+ * Mathematical expression(simple & nested)
+ */
 // console.log(parse('(+ 8 1 0 9 0)'))
 // console.log(parse('(+ 2 3 5)'))
 // console.log(parse('(* 2 3 2)'))
@@ -341,6 +342,18 @@ exports.lisp = parse
 // console.log(parse('(+ (* 6 9) (/ 9 4) 9)'))
 // console.log(parse('(min 1 8 3 4 5)'))
 
+/**
+ * comparision operator expression(simple & nested)
+ */
+// console.log(parse('(> 6 3 5 2 1(< 6 4 8 9))'))
+// console.log(parse('(> 4 3 1)'))
+// console.log(parse('(< 1 4 2)'))
+// console.log(parse('(< 2 3 4)'))
+// console.log(parse('(>= 4 3 2 )'))
+
+/**
+ * if expression(simple and nested)
+ */
 // console.log(parse('(if (<= 1 1) (+ 2 2) (+ 1 1))'))
 // console.log(parse('(if (< 1 2) (+ 6 9) (+ 9 4))'))
 // console.log(parse('(if (> 1 2) (+ 6 9) (+ 9 4))'))
@@ -350,10 +363,26 @@ exports.lisp = parse
 // console.log(parse('(if (<= 1 2) (if (<= 2 2) (+ 1 1) (+ 3 3)) (+ 4 4))'))
 // console.log(parse('(if (< 20 10) (if (< 20 10) (+ 4 4) (+ 5 5)) (if (> 20 10) (if (< 20 10) (if (< 20 10) (+ 4 4) (+ 5 5)) (if (> 20 10) (+ 4 4) (+ 5 5))) (+ 5 5)))'))
 
+/**
+ * if expression with boolean and number parser
+ */
+// console.log(parse('(if 2 3 2)'))
+// console.log(parse('(if #f #t #f)'))
+// console.log(parse('(if #f 6 9)'))
+// console.log(parse('(if (> 6 8) #t #f)'))
+
+/**
+ * define and if expression
+ */
 // console.log(parse('(define k 4)'))
 // console.log(parse('(define r 7)'))
 // console.log(parse('(if (< k r) (+ r 9) (+ k 4))'))
+// console.log(parse('(define one 1)'))
+// console.log(parse('(if (= one 2) (+ one 1) (- one 1))'))
 
+/**
+ * define and lambda expression(simple)
+ */
 // console.log(parse('(define)'))
 // console.log(parse('(define lamda 10)'))
 // console.log(parse('(define r 10)r'))
@@ -363,39 +392,33 @@ exports.lisp = parse
 // console.log(parse('(define add (lambda (x y) (* x y)))'))
 // console.log(parse('(add 6 8)'))
 // console.log(parse('(lambda (x) (+ x x))'))
-// console.log(parse('(define k 10)'))
-// console.log(parse('((lambda (z y) (+ k z y))2 4)'))
 
+/**
+ * define, if, lambda expression(nested and selfinvoking)
+ */
 // console.log(parse('(define i 10)'))
 // console.log(parse('(define k 10)'))
 // console.log(parse('(define y 10)'))
 // console.log(parse('(define add (lambda (i k) (if (> i k) (+ i i) (+ k k)) ))'))
+// console.log(parse('(add 5 9)'))
 // console.log(parse('(define add (lambda (i k) ((lambda (i) (+ i k y))14) ))'))
 // console.log(parse('(add 1 2)'))
-
+// console.log(parse('((lambda (z y) (+ k z y))2 4)'))
 // console.log(parse('(define circlearea (lambda (r) (* 3.14159 (* r r))))'))
 // console.log(parse('(circlearea 3)'))
 // console.log(parse('(define twice (lambda (x) (* 2 x)))'))
 // console.log(parse('(twice (- k 3))'))
-
 // console.log(parse('(define y 5)'))
 // console.log(parse('(define add (lambda (x) (+ x x)))'))
 // console.log(parse('(add 10)'))
 // console.log(parse('((lambda (x) (+ x y)) 1)'))
 // console.log(parse('((lambda (a b) (if(> a b) (+ a a) (+ b b))) 10 20)'))
 // console.log(parse('((lambda (n m) (if(> n m) (add n) (add m))) 12 14)'))
-// console.log(parse('((lambda (i k) (lambda (i) (+ i k y))) 77 77)'))
+// console.log(parse('((lambda (i k) ((lambda (i) (+ i k y))9)) 77 77)'))
 // console.log(parse('((lambda (i k) ((lambda (i k) (+ i k)) 1 9)) 2 3)'))
-// console.log(parse('(define one 1)'))
-// console.log(parse('(if (= one 2) (+ one 1) (- one 1))'))
 
-// console.log(parse('(> 6 3 5 2 1)'))
-// console.log(parse('(> 4 3 1)'))
-// console.log(parse('(< 1 4 2)'))
-// console.log(parse('(< 2 3 4)'))
-// console.log(parse('(>= 4 3 2 )'))
-
-// console.log(parse('(if 2 3 2)'))
-// console.log(parse('(if #f #t #f)'))
-// console.log(parse('(if #f 6 9)'))
-// console.log(parse('(if (> 6 8) #t #f)'))
+/**
+ * Recursive lambda expression
+ */
+// console.log(parse('(define fac (lambda (n) (if (= n 0) 0 (* n (fac (- n 1))))))'))
+// console.log(parse('(fac 10)'))

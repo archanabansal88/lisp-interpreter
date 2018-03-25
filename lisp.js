@@ -6,17 +6,19 @@ const regex = {
   if: /^((\s*)\((\s*)if(\s*))/,
   define: /^((\s*)\((\s*)define(\s*))/,
   lambda: /^((\(\s*)\(?(\s*)lambda(\s*))/,
-  exp: /^(\s*)\((\s*)/
+  exp: /^(\s*)\((\s*)/,
+  boolean: /^(\s*)(#t|#f)/
 }
 
 const spaceParser = input => regexParser(input, regex.space)
 const symbolParser = input => regexParser(input, regex.symbol)
+const booleanParser = input => regexParser(input, regex.boolean)
 
 const regexParser = (input, regex) => {
+  input = input + ''
   const matched = input.match(regex)
   return matched ? [matched[0], input.slice(matched[0].length)] : null
 }
-
 const numberParser = input => {
   const num = regexParser(input, regex.number)
   return num ? [parseFloat(num[0]), num[1]] : null
@@ -98,6 +100,8 @@ const expressionParser = (input, scope) => {
 const extractExpression = input => {
   let str = ''
   if (!input.startsWith('(')) {
+    let value = valueParser(input)
+    if (value) { return value }
     return null
   }
   str += input[0]
@@ -137,7 +141,7 @@ const ifParser = (input, scope) => {
     throw new Error('invalid if syntax')
   }
   // Executing true block statement
-  if (condition[0] === true) {
+  if (condition[0] && condition[0] !== '#f') {
     result = allParser(ifCondition[0], scope)
   } else { // Executing false block statement
     if (!elseCondition) {
@@ -299,8 +303,8 @@ const factoryParser = (...parsers) => {
     return null
   }
 }
-const valueParser = factoryParser(numberParser, expressionParser, symbolParser)
-const allParser = factoryParser(numberParser, ifParser, expressionParser, defineParser, lambdaParser, symbolParser, callParser)
+const valueParser = factoryParser(numberParser, expressionParser, symbolParser, booleanParser)
+const allParser = factoryParser(numberParser, ifParser, expressionParser, defineParser, lambdaParser, symbolParser, callParser, booleanParser)
 
 /**
  *parsing all parsers
@@ -382,6 +386,8 @@ exports.lisp = parse
 // console.log(parse('((lambda (n m) (if(> n m) (add n) (add m))) 12 14)'))
 // console.log(parse('((lambda (i k) (lambda (i) (+ i k y))) 77 77)'))
 // console.log(parse('((lambda (i k) ((lambda (i k) (+ i k)) 1 9)) 2 3)'))
+// console.log(parse('(define one 1)'))
+// console.log(parse('(if (= one 2) (+ one 1) (- one 1))'))
 
 // console.log(parse('(> 6 3 5 2 1)'))
 // console.log(parse('(> 4 3 1)'))
@@ -389,9 +395,7 @@ exports.lisp = parse
 // console.log(parse('(< 2 3 4)'))
 // console.log(parse('(>= 4 3 2 )'))
 
-// console.log(parse('(define fac (lambda (n) (if (= n 0) (+ 0 1) (* n (fac (- n 1))))))'))
-// console.log(parse('(fac 10)'))
-// console.log(parse('(define fib (lambda (n)(if (= n 0) 0 (if (= n 1) 1(+ (fib (- n 1)) (fib (- n 2)))))))'))
-// console.log(parse('(fib 10)'))
-// console.log(parse('(define one 1)'))
-// console.log(parse('(if (= one 2) (+ one 1) (- one 1))'))
+// console.log(parse('(if 2 3 2)'))
+// console.log(parse('(if #f #t #f)'))
+// console.log(parse('(if #f 6 9)'))
+// console.log(parse('(if (> 6 8) #t #f)'))

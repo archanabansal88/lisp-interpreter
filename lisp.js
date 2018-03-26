@@ -379,11 +379,11 @@ exports.lisp = parse
 /**
  * define and if expression
  */
-// console.log(parse('(define k 4)'))
 // console.log(parse('(define r 7)'))
-// console.log(parse('(if (< k r) (+ r 9) (+ k 4))'))
 // console.log(parse('(define one 1)'))
 // console.log(parse('(if (= one 2) (+ one 1) (- one 1))'))
+// console.log(parse('(define k (+ 4 7))'))
+// console.log(parse('(if (> k r) (+ r 9) (+ k 4))'))
 
 /**
  * define and lambda expression(simple)
@@ -426,6 +426,6 @@ exports.lisp = parse
  * Recursive lambda expression
  */
 // console.log(parse('(define fac (lambda (n) (if (= n 0) 1 (* n (fac (- n 1))))))'))
-// console.log(parse('(fac 10)'))
+// console.log(parse('(fac 5)'))
 // console.log(parse('(define fib (lambda (n)(if (= n 0) 0 (if (= n 1) 1 (+ (fib (- n 1)) (fib (- n 2)))))))'))
-// console.log(parse('(fib 10)'))
+// console.log(parse('(fib 15)'))

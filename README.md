@@ -23,10 +23,11 @@ The heart of the Lisp interpreter is the "read-eval-print" loop. That is, the in
 * print the results
 
 LISP uses a very simple notation in which operations and their operands are given in a parenthesized list. 
-For example, (+ a (* b c)) stands for a + b*c
-             (+ 2 2) stands for 4
+For example, 
+* (+ a (* b c)) stands for a + b*c
+* (+ 2 2) stands for 4
 
-_[lisp](https://en.wikipedia.org/wiki/Lisp_(programming_language))_
+_[lisp_wiki](https://en.wikipedia.org/wiki/Lisp_(programming_language))_
 
 _[lisp](http://www.norvig.com/lispy.html)_
 
